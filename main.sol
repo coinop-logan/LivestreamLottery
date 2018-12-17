@@ -1,10 +1,15 @@
 pragma solidity 0.5.1;
 
-import "browser/prandom.sol";
+import "prandom.sol";
 
 contract LSLottery is PseudoRandom {
   enum Phase {Open, Resolving, Judgement}
   Phase public phase;
+
+  //In the Open phase, people can buy tickets to the lottery.
+  //In the Resolving phase, the lottery waits 3 blocks to get a block header as a source of randomness (see PseudoRandom).
+  //In the Judgement phase, judges have the opportunity to burn the prize if the winner didn't deliver a livestream.
+  //Once Judgement ends, the contract cycles to the Open phase.
 
   modifier inPhase(Phase p) {
     require (phase == p, "Contract is in the wrong phase for that function.");
@@ -15,7 +20,7 @@ contract LSLottery is PseudoRandom {
   uint public judgementIntervalInBlocks;
 
   constructor(uint _ticketPrice, uint _judgementIntervalInBlocks)
-  PseudoRandom(2)
+  PseudoRandom(2) // PseudoRandom will use 2 block headers as a source of randomness.
   public {
     phase = Phase.Open;
 
@@ -23,8 +28,8 @@ contract LSLottery is PseudoRandom {
     judgementIntervalInBlocks = _judgementIntervalInBlocks;
   }
 
+  // Each ticket is simply the address of the buyer.
   address payable[] public tickets;
-  //mapping (address => uint[]) public ticketsForAccounts;
 
   function buyTickets(uint numTickets)
   external
@@ -43,8 +48,10 @@ contract LSLottery is PseudoRandom {
     }
   }
 
+  // What block number will we give to PseudoRandom to generate random values?
   uint randomSourceBlocknum;
 
+  // Sets randomSourceBlocknum and starts the Resolving phase.
   function startResolving()
   external
   inPhase(Phase.Open) {
@@ -63,8 +70,11 @@ contract LSLottery is PseudoRandom {
   }
   Judge[5] public judges;
 
+  // When can the winner take the prize (assuming it hasn't been burned yet)?
   uint releaseAvailableBlocknum;
 
+  // If the randomSourceBlocknum block is mined, determine the winner and judges,
+  // change to Judgement phase, and set releaseAvailableBlocknum.
   function resolve()
   external
   inPhase(Phase.Resolving) {
@@ -86,6 +96,13 @@ contract LSLottery is PseudoRandom {
     releaseAvailableBlocknum = block.number + judgementIntervalInBlocks;
   }
 
+  // Efficiently removes one ticket
+  function removeTicket(uint iter)
+  internal {
+    tickets[iter] = tickets[tickets.length-1];
+    tickets.length--; // pop last item off of tickets
+  }
+
   function voteToBurn(uint judgeIter)
   external
   inPhase(Phase.Judgement) {
@@ -95,6 +112,7 @@ contract LSLottery is PseudoRandom {
     burnIfNecessary();
   }
 
+  // Tallies 'burn' votes. If there are enough, burn the prize and restart Lottery.
   function burnIfNecessary()
   internal {
     uint numBurnVotes;
@@ -105,35 +123,31 @@ contract LSLottery is PseudoRandom {
     }
 
     if (numBurnVotes == 2) {
-      burnReward();
-      restart();
+      burnRewardAndRestart();
     }
   }
 
-  function burnReward()
+  function burnRewardAndRestart()
   internal {
     address(0x0).transfer(address(this).balance); // Damn son that's cold
+
+    restart();
   }
 
+  // The winner or anyone else can call this if the prize has not yet been burned
   function releasePrizeAndRestart()
   external
   inPhase(Phase.Judgement) {
     require(block.number >= releaseAvailableBlocknum, "Release is not yet available!");
 
-    winningAddress.transfer(address(this).balance);
+    winningAddress.transfer(address(this).balance); // Hella
 
     restart();
-  }
-
-  function removeTicket(uint iter)
-  internal {
-    tickets[iter] = tickets[tickets.length-1];
-    tickets.length--;
   }
 
   function restart()
   internal {
     phase = Phase.Open;
-    tickets.length = 0;
+    tickets.length = 0; // clear tickets array
   }
 }
