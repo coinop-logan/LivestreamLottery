@@ -18,14 +18,20 @@ contract LSLottery is PseudoRandom {
 
   uint public ticketPrice;
   uint public judgementIntervalInBlocks;
+  uint public openIntervalInBlocks;
 
-  constructor(uint _ticketPrice, uint _judgementIntervalInBlocks)
+  uint public openPhaseEndBlock;
+
+  constructor(uint _ticketPrice, uint _judgementIntervalInBlocks, uint _openIntervalInBlocks)
   PseudoRandom(2) // PseudoRandom will use 2 block headers as a source of randomness.
   public {
     phase = Phase.Open;
 
     ticketPrice = _ticketPrice;
     judgementIntervalInBlocks = _judgementIntervalInBlocks;
+    openIntervalInBlocks = _openIntervalInBlocks;
+
+    openPhaseEndBlock = block.number + openIntervalInBlocks;
   }
 
   // Each ticket is simply the address of the buyer.
@@ -56,6 +62,7 @@ contract LSLottery is PseudoRandom {
   external
   inPhase(Phase.Open) {
     require(tickets.length > 6, "Can't start a lottery with 6 tickets or less!");
+    require(block.number >= openPhaseEndBlock, "Can't end the Open phase so soon!");
 
     randomSourceBlocknum = block.number + 3;
 
