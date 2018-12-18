@@ -37,6 +37,10 @@ contract LSLottery is PseudoRandom {
   // Each ticket is simply the address of the buyer.
   address payable[] public tickets;
 
+  // Not used in logic; just updated for the sake of an interface getter.
+  mapping (address => uint) public numTicketsFor;
+  address[] public uniqueTicketHolders;
+
   function buyTickets(uint numTickets)
   external
   inPhase(Phase.Open)
@@ -51,6 +55,10 @@ contract LSLottery is PseudoRandom {
   internal {
     for (uint i=0; i<numTickets; i++) {
       tickets.push(who);
+      if (numTicketsFor[who] == 0) {
+        uniqueTicketHolders.push(who);
+      }
+      numTicketsFor[who] ++;
     }
   }
 
@@ -91,11 +99,11 @@ contract LSLottery is PseudoRandom {
 
     uint winningTicket = PseudoRandom.nextUint(tickets.length-1);
     winningAddress = tickets[winningTicket];
-    removeTicket(winningTicket);
+    removeTicketDuringResolution(winningTicket);
     for (uint i=0; i<judges.length; i++) {
       uint judgeTicket = PseudoRandom.nextUint(tickets.length-1);
       judges[i] = Judge(tickets[judgeTicket], false);
-      removeTicket(judgeTicket);
+      removeTicketDuringResolution(judgeTicket);
     }
 
     phase = Phase.Judgement;
@@ -103,8 +111,9 @@ contract LSLottery is PseudoRandom {
     judgementPhaseEndBlock = block.number + judgementIntervalInBlocks;
   }
 
-  // Efficiently removes one ticket
-  function removeTicket(uint iter)
+  // Efficiently removes one ticket.
+  // Assumes we no longer need to effectively track numTicketsFor (hence 'DuringResolution').
+  function removeTicketDuringResolution(uint iter)
   internal {
     tickets[iter] = tickets[tickets.length-1];
     tickets.length--; // pop last item off of tickets
@@ -156,13 +165,21 @@ contract LSLottery is PseudoRandom {
   internal {
     phase = Phase.Open;
     tickets.length = 0; // clear tickets array
+
+    // Reset mapping (this is why we needed uniqueTicketHolders)
+    // Note that uniqueTicketHolders might hold some false positives, due to removeTicketDuringResolution,
+    // but no harm done.
+    for (uint i=0; i<uniqueTicketHolders.length; i++) {
+      numTicketsFor[uniqueTicketHolders[i]] = 0;
+    }
   }
 
   // --------------------- INTERFACE GETTERS --------------------------
 
   function numTickets()
   external
-  view {
+  view
+  returns(uint) {
     return tickets.length;
   }
 }
