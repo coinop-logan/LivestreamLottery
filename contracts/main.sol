@@ -78,10 +78,10 @@ contract LSLottery is PseudoRandom {
   Judge[5] public judges;
 
   // When can the winner take the prize (assuming it hasn't been burned yet)?
-  uint releaseAvailableBlocknum;
+  uint public judgementPhaseEndBlock;
 
   // If the randomSourceBlocknum block is mined, determine the winner and judges,
-  // change to Judgement phase, and set releaseAvailableBlocknum.
+  // change to Judgement phase, and set judgementPhaseEndBlock.
   function resolve()
   external
   inPhase(Phase.Resolving) {
@@ -100,7 +100,7 @@ contract LSLottery is PseudoRandom {
 
     phase = Phase.Judgement;
 
-    releaseAvailableBlocknum = block.number + judgementIntervalInBlocks;
+    judgementPhaseEndBlock = block.number + judgementIntervalInBlocks;
   }
 
   // Efficiently removes one ticket
@@ -145,7 +145,7 @@ contract LSLottery is PseudoRandom {
   function releasePrizeAndRestart()
   external
   inPhase(Phase.Judgement) {
-    require(block.number >= releaseAvailableBlocknum, "Release is not yet available!");
+    require(block.number >= judgementPhaseEndBlock, "Release is not yet available!");
 
     winningAddress.transfer(address(this).balance); // Hella
 
