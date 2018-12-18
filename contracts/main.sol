@@ -157,4 +157,12 @@ contract LSLottery is PseudoRandom {
     phase = Phase.Open;
     tickets.length = 0; // clear tickets array
   }
+
+  // --------------------- INTERFACE GETTERS --------------------------
+
+  function numTickets()
+  external
+  view {
+    return tickets.length;
+  }
 }
